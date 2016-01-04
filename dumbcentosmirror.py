@@ -8,9 +8,19 @@ import os
 import sys
 
 
+def random_mirror(region):
+    import StringIO
+    import csv
+    import random
+    res = requests.get("http://www.centos.org/download/full-mirrorlist.csv")
+    csvfile = StringIO(res.text)
+    mirror = random.choice(
+        [row for row in csv.DictReader(csvfile) if row['rsync mirror link'] and row['Region'] == region])
+    return mirror['rsync mirror link'], mirror['http_mirror_link']
+
+
 def scrape_index_by_major(mirror, major):
-    mirror_index = "http://{mirror}/CentOS/".format(mirror=mirror)
-    res = requests.get(mirror_index)
+    res = requests.get(mirror)
     soup = BeautifulSoup(res.text, 'lxml')
     releases = []
     for link in soup.find_all('a'):
@@ -21,9 +31,10 @@ def scrape_index_by_major(mirror, major):
             releases.append(link['href'].strip('/'))
     return releases
 
+
 def clone(mirror, release, dest_path):
     command = ['rsync', '-avSHP', '--delete', '--exclude', 'local*', '--exclude', 'isos',
-               "{mirror}::CentOS/{release}/".format(mirror=mirror, release=release),
+               "{mirror}/{release}/".format(mirror=mirror, release=release),
                "{dest_path}/{release}".format(dest_path=dest_path, release=release)]
     print "Running: {0}".format(" ".join(command))
     try:
@@ -53,14 +64,18 @@ def unlock(fd):
 
 
 @click.command()
-@click.option('--mirror', default="mirror.rackspace.com")
+@click.option('--http-mirror')
+@click.option('--rsync-mirror')
+@click.option('--region', default="US")
 @click.option('--major', default="7")
 @click.option('--newest-only/--no-newest-only', default=False)
 @click.option('--dest-path', default='.')
 @click.option('--nope/--no-nope', '-n', default=False)
-def main(mirror, major, newest_only, dest_path, nope):
+def main(http_mirror, rsync_mirror, region, major, newest_only, dest_path, nope):
+    if not http_mirror or not rsync_mirror:
+        http_mirror, rsync_mirror = random_mirror(region)
     my_lock = lock(dest_path)
-    releases = scrape_index_by_major(mirror, major)
+    releases = scrape_index_by_major(http_mirror, major)
     if newest_only:
         releases = [sorted(releases)[-1]]
     for release in releases:
@@ -68,7 +83,7 @@ def main(mirror, major, newest_only, dest_path, nope):
             print "Totally would have fetched {0}".format(release)
         else:
             print "Fetching {0}".format(release)
-            clone(mirror, release, dest_path)
+            clone(rsync_mirror, release, dest_path)
     unlock(my_lock)
 
 if __name__ == '__main__':

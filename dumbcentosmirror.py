@@ -9,7 +9,7 @@ import sys
 
 
 def random_mirror(region):
-    import StringIO
+    from StringIO import StringIO
     import csv
     import random
     res = requests.get("http://www.centos.org/download/full-mirrorlist.csv")

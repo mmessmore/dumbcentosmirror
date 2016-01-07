@@ -76,8 +76,6 @@ def unlock(fd):
 def main(http_mirror, rsync_mirror, region, major, newest_only, dest_path, nope):
     if not http_mirror or not rsync_mirror:
         http_mirror, rsync_mirror = random_mirror(region)
-        print "yay: {0} {1}".format(http_mirror, rsync_mirror)
-        sys.exit(0)
     my_lock = lock(dest_path)
     releases = scrape_index_by_major(http_mirror, major)
     if newest_only:

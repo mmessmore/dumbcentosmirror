@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+
 import click
 import requests
 from bs4 import BeautifulSoup
@@ -9,14 +10,15 @@ import sys
 
 
 def random_mirror(region):
-    from StringIO import StringIO
-    import csv
     import random
+    import csv
+    import StringIO
+    import unicodedata
     res = requests.get("http://www.centos.org/download/full-mirrorlist.csv")
-    csvfile = StringIO(res.text)
-    mirror = random.choice(
-        [row for row in csv.DictReader(csvfile) if row['rsync mirror link'] and row['Region'] == region])
-    return mirror['rsync mirror link'], mirror['http_mirror_link']
+    csv_file = StringIO.StringIO(unicodedata.normalize('NFKD', res.text).encode('ascii', 'ignore'))
+    mirrors = [row for row in csv.DictReader(csv_file) if row['Region'] == region and row['rsync mirror link']]
+    mirror = random.choice(mirrors)
+    return mirror['http mirror link'], mirror['rsync mirror link']
 
 
 def scrape_index_by_major(mirror, major):
@@ -74,6 +76,8 @@ def unlock(fd):
 def main(http_mirror, rsync_mirror, region, major, newest_only, dest_path, nope):
     if not http_mirror or not rsync_mirror:
         http_mirror, rsync_mirror = random_mirror(region)
+        print "yay: {0} {1}".format(http_mirror, rsync_mirror)
+        sys.exit(0)
     my_lock = lock(dest_path)
     releases = scrape_index_by_major(http_mirror, major)
     if newest_only:
